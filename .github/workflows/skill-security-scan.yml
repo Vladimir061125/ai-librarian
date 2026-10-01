@@ -1,0 +1,46 @@
+name: Skill Security Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      skill_url:
+        description: "GitHub repository URL of the Skill to scan"
+        required: true
+        type: string
+      scan_name:
+        description: "Human-readable scan name"
+        required: false
+        default: "manual-scan"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.1.0
+
+      - name: Install SkillSpector
+        run: |
+          uv tool install git+https://github.com/NVIDIA/skillspector.git
+
+      - name: Scan Skill
+        run: |
+          mkdir -p reports
+          skillspector scan "${{ inputs.skill_url }}" --no-llm --format json --output reports/skillspector-report.json
+
+      - name: Validate report
+        run: |
+          test -s reports/skillspector-report.json
+          python -m json.tool reports/skillspector-report.json > /dev/null
+
+      - name: Upload SkillSpector report
+        uses: actions/upload-artifact@v4
+        with:
+          name: skillspector-${{ inputs.scan_name }}
+          path: reports/skillspector-report.json
+          if-no-files-found: error
