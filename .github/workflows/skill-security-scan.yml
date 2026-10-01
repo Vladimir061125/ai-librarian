@@ -1,6 +1,8 @@
 name: Skill Security Scan
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       skill_url:
@@ -21,6 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Set scan target
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "skill_url=https://github.com/Leonxlnx/unlazy" >> "$GITHUB_OUTPUT"
+            echo "scan_name=unlazy-first-test" >> "$GITHUB_OUTPUT"
+          else
+            echo "skill_url=${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
+            echo "scan_name=${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install uv
         uses: astral-sh/setup-uv@v10.1.0
 
@@ -31,7 +44,7 @@ jobs:
       - name: Scan Skill
         run: |
           mkdir -p reports
-          skillspector scan "${{ inputs.skill_url }}" --no-llm --format json --output reports/skillspector-report.json
+          skillspector scan "${{ steps.target.outputs.skill_url }}" --no-llm --format json --output reports/skillspector-report.json
 
       - name: Validate report
         run: |
@@ -41,6 +54,6 @@ jobs:
       - name: Upload SkillSpector report
         uses: actions/upload-artifact@v4
         with:
-          name: skillspector-${{ inputs.scan_name }}
+          name: skillspector-${{ steps.target.outputs.scan_name }}
           path: reports/skillspector-report.json
           if-no-files-found: error
