@@ -42,18 +42,49 @@ jobs:
           uv tool install git+https://github.com/NVIDIA/skillspector.git
 
       - name: Scan Skill
+        id: scan
+        shell: bash
         run: |
           mkdir -p reports
+          set +e
           skillspector scan "${{ steps.target.outputs.skill_url }}" --no-llm --format json --output reports/skillspector-report.json
+          scan_exit=$?
+          set -e
+          echo "$scan_exit" > reports/scan-exit-code.txt
+          echo "SkillSpector exit code: $scan_exit"
+          exit 0
 
-      - name: Validate report
+      - name: Validate and summarize report
         run: |
           test -s reports/skillspector-report.json
           python -m json.tool reports/skillspector-report.json > /dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("reports/skillspector-report.json")
+          data = json.loads(p.read_text())
+          print("=== SkillSpector summary ===")
+          for key in ("risk_score", "risk_severity", "risk_recommendation"):
+              if key in data:
+                  print(f"{key}: {data[key]}")
+          findings = data.get("findings", [])
+          print(f"findings: {len(findings) if isinstance(findings, list) else 'n/a'}")
+          PY
 
       - name: Upload SkillSpector report
         uses: actions/upload-artifact@v4
         with:
           name: skillspector-${{ steps.target.outputs.scan_name }}
-          path: reports/skillspector-report.json
+          path: reports/
           if-no-files-found: error
+
+      - name: Apply security gate
+        run: |
+          scan_exit=$(cat reports/scan-exit-code.txt)
+          if [ "$scan_exit" -ne 0 ]; then
+            echo "SkillSpector detected a non-zero scan result: $scan_exit"
+            echo "The report has already been uploaded as an artifact."
+            exit "$scan_exit"
+          fi
+          echo "SkillSpector scan passed with exit code 0."
