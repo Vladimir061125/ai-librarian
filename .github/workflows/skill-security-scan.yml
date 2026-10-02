@@ -1,8 +1,6 @@
 name: Skill Security Scan
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       skill_url:
@@ -26,20 +24,15 @@ jobs:
       - name: Set scan target
         id: target
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "skill_url=https://github.com/Leonxlnx/unlazy" >> "$GITHUB_OUTPUT"
-            echo "scan_name=unlazy-first-test" >> "$GITHUB_OUTPUT"
-          else
-            echo "skill_url=${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
-            echo "scan_name=${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "skill_url=${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
+          echo "scan_name=${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.1.0
 
       - name: Install SkillSpector
         run: |
-          uv tool install git+https://github.com/NVIDIA/skillspector.git
+          uv tool install git+https://github.com/NVIDIA/skillspector.git@60c663d0db6ade3d332f4747a3c5ed5937bb1f8d
 
       - name: Scan Skill
         id: scan
@@ -68,8 +61,14 @@ jobs:
           for key in ("risk_score", "risk_severity", "risk_recommendation"):
               if key in data:
                   print(f"{key}: {data[key]}")
-          findings = data.get("findings", [])
+          findings = data.get("findings") or data.get("issues") or []
+          metadata = data.get("metadata") or {}
           print(f"findings: {len(findings) if isinstance(findings, list) else 'n/a'}")
+          print(f"llm_requested: {metadata.get('llm_requested', 'n/a')}")
+          print(f"analysis_status: {metadata.get('analysis_status', 'n/a')}")
+          if isinstance(data.get("risk_assessment"), dict):
+              ra = data["risk_assessment"]
+              print(f"risk_assessment: {ra.get('score', ra.get('risk_score', 'n/a'))} / {ra.get('severity', 'n/a')} / {ra.get('recommendation', 'n/a')}")
           PY
 
       - name: Upload SkillSpector report
