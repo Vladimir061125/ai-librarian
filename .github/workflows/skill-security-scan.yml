@@ -5,12 +5,13 @@ on:
     inputs:
       skill_url:
         description: "GitHub repository URL of the Skill to scan"
-        required: true
+        required: false
+        default: "https://github.com/Leonxlnx/taste-skill"
         type: string
       scan_name:
         description: "Human-readable scan name"
         required: false
-        default: "manual-scan"
+        default: "taste-skill"
         type: string
 
 permissions:
