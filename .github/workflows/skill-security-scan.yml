@@ -30,17 +30,17 @@ jobs:
       - name: Set scan target
         id: target
         run: |
-          echo "skill_url=\${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
-          echo "scan_name=\${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
+          echo "skill_url=${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
+          echo "scan_name=${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout Skill repository
         id: source
         run: |
           rm -rf skill-source
-          git clone --depth 1 --no-tags --filter=blob:none "\${{ inputs.skill_url }}" skill-source
-          TARGET_PATH="skill-source/\${{ inputs.skill_path }}"
-          case "\${{ inputs.skill_path }}" in
-            /*|*..*) echo "Invalid skill_path: \${{ inputs.skill_path }}"; exit 2 ;;
+          git clone --depth 1 --no-tags --filter=blob:none "${{ inputs.skill_url }}" skill-source
+          TARGET_PATH="skill-source/${{ inputs.skill_path }}"
+          case "${{ inputs.skill_path }}" in
+            /*|*..*) echo "Invalid skill_path: ${{ inputs.skill_path }}"; exit 2 ;;
           esac
           test -e "$TARGET_PATH"
           if [ -f "$TARGET_PATH" ]; then
@@ -63,12 +63,12 @@ jobs:
         run: |
           mkdir -p reports
           set +e
-          skillspector scan "\${{ steps.source.outputs.target_path }}" --no-llm --format json --output reports/skillspector-report.json
+          skillspector scan "${{ steps.source.outputs.target_path }}" --no-llm --format json --output reports/skillspector-report.json
           scan_exit=$?
           set -e
           echo "$scan_exit" > reports/scan-exit-code.txt
           echo "SkillSpector exit code: $scan_exit"
-          echo "Scanned target: \${{ inputs.skill_path }}"
+          echo "Scanned target: ${{ inputs.skill_path }}"
           exit 0
 
       - name: Validate and summarize report
@@ -98,7 +98,7 @@ jobs:
       - name: Upload SkillSpector report
         uses: actions/upload-artifact@v4
         with:
-          name: skillspector-\${{ steps.target.outputs.scan_name }}
+          name: skillspector-${{ steps.target.outputs.scan_name }}
           path: reports/
           if-no-files-found: error
 
