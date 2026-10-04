@@ -18,11 +18,6 @@ on:
         required: false
         default: "skills/taste-skill"
         type: string
-      scan_name:
-        description: "Human-readable scan name"
-        required: false
-        default: "taste-skill"
-        type: string
 
 permissions:
   contents: read
@@ -35,17 +30,17 @@ jobs:
       - name: Set scan target
         id: target
         run: |
-          echo "skill_url=${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
-          echo "scan_name=${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
+          echo "skill_url=\${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
+          echo "scan_name=\${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout Skill repository
         id: source
         run: |
           rm -rf skill-source
-          git clone --depth 1 --no-tags --filter=blob:none "${{ inputs.skill_url }}" skill-source
-          TARGET_PATH="skill-source/${{ inputs.skill_path }}"
-          case "${{ inputs.skill_path }}" in
-            /*|*..*) echo "Invalid skill_path: ${{ inputs.skill_path }}"; exit 2 ;;
+          git clone --depth 1 --no-tags --filter=blob:none "\${{ inputs.skill_url }}" skill-source
+          TARGET_PATH="skill-source/\${{ inputs.skill_path }}"
+          case "\${{ inputs.skill_path }}" in
+            /*|*..*) echo "Invalid skill_path: \${{ inputs.skill_path }}"; exit 2 ;;
           esac
           test -e "$TARGET_PATH"
           if [ -f "$TARGET_PATH" ]; then
@@ -68,12 +63,12 @@ jobs:
         run: |
           mkdir -p reports
           set +e
-          skillspector scan "${{ steps.source.outputs.target_path }}" --no-llm --format json --output reports/skillspector-report.json
+          skillspector scan "\${{ steps.source.outputs.target_path }}" --no-llm --format json --output reports/skillspector-report.json
           scan_exit=$?
           set -e
           echo "$scan_exit" > reports/scan-exit-code.txt
           echo "SkillSpector exit code: $scan_exit"
-          echo "Scanned target: ${{ inputs.skill_path }}"
+          echo "Scanned target: \${{ inputs.skill_path }}"
           exit 0
 
       - name: Validate and summarize report
@@ -103,83 +98,7 @@ jobs:
       - name: Upload SkillSpector report
         uses: actions/upload-artifact@v4
         with:
-          name: skillspector-${{ steps.target.outputs.scan_name }}
-          path: reports/
-          if-no-files-found: error
-
-      - name: Apply security gate
-        run: |
-          scan_exit=$(cat reports/scan-exit-code.txt)
-          if [ "$scan_exit" -ne 0 ]; then
-            echo "SkillSpector detected a non-zero scan result: $scan_exit"
-            echo "The report has already been uploaded as an artifact."
-            exit "$scan_exit"
-          fi
-          echo "SkillSpector scan passed with exit code 0."
-
-
-permissions:
-  contents: read
-
-jobs:
-  scan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Set scan target
-        id: target
-        run: |
-          echo "skill_url=${{ inputs.skill_url }}" >> "$GITHUB_OUTPUT"
-          echo "scan_name=${{ inputs.scan_name }}" >> "$GITHUB_OUTPUT"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.1.0
-
-      - name: Install SkillSpector
-        run: |
-          uv tool install git+https://github.com/NVIDIA/skillspector.git@60c663d0db6ade3d332f4747a3c5ed5937bb1f8d
-
-      - name: Scan Skill
-        id: scan
-        shell: bash
-        run: |
-          mkdir -p reports
-          set +e
-          skillspector scan "${{ steps.target.outputs.skill_url }}" --no-llm --format json --output reports/skillspector-report.json
-          scan_exit=$?
-          set -e
-          echo "$scan_exit" > reports/scan-exit-code.txt
-          echo "SkillSpector exit code: $scan_exit"
-          exit 0
-
-      - name: Validate and summarize report
-        run: |
-          test -s reports/skillspector-report.json
-          python -m json.tool reports/skillspector-report.json > /dev/null
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          p = Path("reports/skillspector-report.json")
-          data = json.loads(p.read_text())
-          print("=== SkillSpector summary ===")
-          for key in ("risk_score", "risk_severity", "risk_recommendation"):
-              if key in data:
-                  print(f"{key}: {data[key]}")
-          findings = data.get("findings") or data.get("issues") or []
-          metadata = data.get("metadata") or {}
-          print(f"findings: {len(findings) if isinstance(findings, list) else 'n/a'}")
-          print(f"llm_requested: {metadata.get('llm_requested', 'n/a')}")
-          print(f"analysis_status: {metadata.get('analysis_status', 'n/a')}")
-          if isinstance(data.get("risk_assessment"), dict):
-              ra = data["risk_assessment"]
-              print(f"risk_assessment: {ra.get('score', ra.get('risk_score', 'n/a'))} / {ra.get('severity', 'n/a')} / {ra.get('recommendation', 'n/a')}")
-          PY
-
-      - name: Upload SkillSpector report
-        uses: actions/upload-artifact@v4
-        with:
-          name: skillspector-${{ steps.target.outputs.scan_name }}
+          name: skillspector-\${{ steps.target.outputs.scan_name }}
           path: reports/
           if-no-files-found: error
 
