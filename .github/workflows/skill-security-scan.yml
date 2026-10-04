@@ -63,7 +63,7 @@ jobs:
         run: |
           mkdir -p reports
           set +e
-          skillspector scan "${{ steps.source.outputs.target_path }}" --no-llm --format json --output reports/skillspector-report.json
+          skillspector scan "${{ steps.source.outputs.target_path }}" --no-llm --fail-on-incomplete --format json --output reports/skillspector-report.json
           scan_exit=$?
           set -e
           echo "$scan_exit" > reports/scan-exit-code.txt
@@ -90,6 +90,14 @@ jobs:
           print(f"findings: {len(findings) if isinstance(findings, list) else 'n/a'}")
           print(f"llm_requested: {metadata.get('llm_requested', 'n/a')}")
           print(f"analysis_status: {metadata.get('analysis_status', 'n/a')}")
+          completeness = data.get("analysis_completeness") or {}
+          print(f"coverage_percent: {completeness.get('coverage_percent', 'n/a')}")
+          print(f"completeness_status: {completeness.get('status', 'n/a')}")
+          print(f"completeness_is_complete: {completeness.get('is_complete', 'n/a')}")
+          exceptions = completeness.get("ledger_exceptions") or []
+          print(f"ledger_exceptions: {len(exceptions) if isinstance(exceptions, list) else 'n/a'}")
+          degraded = [a.get("analyzer_id") for a in (completeness.get("analyzer_statuses") or []) if a.get("status") == "degraded"]
+          print(f"degraded_analyzers: {degraded}")
           if isinstance(data.get("risk_assessment"), dict):
               ra = data["risk_assessment"]
               print(f"risk_assessment: {ra.get('score', ra.get('risk_score', 'n/a'))} / {ra.get('severity', 'n/a')} / {ra.get('recommendation', 'n/a')}")
