@@ -111,11 +111,32 @@ jobs:
           if-no-files-found: error
 
       - name: Apply security gate
+        shell: bash
         run: |
           scan_exit=$(cat reports/scan-exit-code.txt)
           if [ "$scan_exit" -ne 0 ]; then
-            echo "SkillSpector detected a non-zero scan result: $scan_exit"
+            echo "SkillSpector returned a non-zero scan result: $scan_exit"
             echo "The report has already been uploaded as an artifact."
             exit "$scan_exit"
           fi
-          echo "SkillSpector scan passed with exit code 0."
+
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path("reports/skillspector-report.json").read_text())
+          completeness = report.get("analysis_completeness") or {}
+          assessment = report.get("risk_assessment") or {}
+
+          print(f"Final security assessment: {assessment.get('score', 'n/a')} / {assessment.get('severity', 'n/a')} / {assessment.get('recommendation', 'n/a')}")
+          print(f"Completeness status: {completeness.get('status', 'n/a')}")
+          print(f"Coverage: {completeness.get('coverage_percent', 'n/a')}%")
+          print(f"Is complete: {completeness.get('is_complete', 'n/a')}")
+
+          if completeness.get("is_complete") is not True or completeness.get("status") != "complete":
+              print("SECURITY GATE FAILED: SkillSpector analysis is incomplete. Review the uploaded report; a green scan alone is not a security pass.")
+              sys.exit(1)
+
+          print("Analysis completeness gate passed.")
+          PY
